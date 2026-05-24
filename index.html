@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ソート可能なリスト</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+    th { background: #f0f0f0; cursor: pointer; user-select: none; }
+    th:hover { background: #ddd; }
+    th.asc::after  { content: " ▲"; }
+    th.desc::after { content: " ▼"; }
+  </style>
+</head>
+<body>
+  <table id="myTable">
+    <thead>
+      <tr>
+        <th onclick="sortTable(0)">名前</th>
+        <th onclick="sortTable(1)">年齢</th>
+        <th onclick="sortTable(2)">都市</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>田中</td><td>28</td><td>東京</td></tr>
+      <tr><td>鈴木</td><td>34</td><td>大阪</td></tr>
+      <tr><td>佐藤</td><td>22</td><td>福岡</td></tr>
+      <tr><td>山田</td><td>45</td><td>札幌</td></tr>
+    </tbody>
+  </table>
+
+  <script>
+    let lastCol = -1, asc = true;
+
+    function sortTable(col) {
+      const table = document.getElementById("myTable");
+      const tbody = table.tBodies[0];
+      const rows = Array.from(tbody.rows);
+
+      if (lastCol === col) {
+        asc = !asc;
+      } else {
+        asc = true;
+        lastCol = col;
+      }
+
+      rows.sort((a, b) => {
+        const aText = a.cells[col].innerText;
+        const bText = b.cells[col].innerText;
+        const aNum = parseFloat(aText);
+        const bNum = parseFloat(bText);
+        const isNum = !isNaN(aNum) && !isNaN(bNum);
+        const result = isNum ? aNum - bNum : aText.localeCompare(bText, "ja");
+        return asc ? result : -result;
+      });
+
+      rows.forEach(r => tbody.appendChild(r));
+
+      // ヘッダーの矢印更新
+      Array.from(table.tHead.rows[0].cells).forEach((th, i) => {
+        th.className = i === col ? (asc ? "asc" : "desc") : "";
+      });
+    }
+  </script>
+</body>
+</html>
