@@ -3,66 +3,187 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ソート可能なリスト</title>
+  <title>リスト</title>
   <style>
-    body { font-family: sans-serif; padding: 16px; }
-    table { border-collapse: collapse; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
-    th { background: #f0f0f0; cursor: pointer; user-select: none; }
-    th:hover { background: #ddd; }
-    th.asc::after  { content: " ▲"; }
-    th.desc::after { content: " ▼"; }
+    body { font-family: sans-serif; padding: 16px; max-width: 800px; margin: 0 auto; }
+
+    .section { background: #f8f8f8; border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+    .section h3 { margin: 0 0 10px; font-size: 14px; color: #555; }
+
+    .col-checks { display: flex; flex-wrap: wrap; gap: 8px; }
+    .col-checks label {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 14px; cursor: pointer;
+      background: white; border: 1px solid #ddd;
+      border-radius: 4px; padding: 4px 10px;
+    }
+
+    .sort-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .sort-row span { font-size: 13px; color: #666; width: 56px; flex-shrink: 0; }
+    .sort-row select { flex: 1; padding: 6px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; }
+    .order-btn {
+      padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc;
+      background: white; cursor: pointer; font-size: 13px; white-space: nowrap;
+    }
+    .order-btn.asc  { background: #e8f0fe; border-color: #4a90e2; color: #4a90e2; }
+    .order-btn.desc { background: #fce8e6; border-color: #d95050; color: #d95050; }
+
+    .apply-btn {
+      width: 100%; padding: 10px; background: #4a90e2; color: white;
+      border: none; border-radius: 6px; font-size: 15px; cursor: pointer; margin-top: 4px;
+    }
+    .apply-btn:active { background: #357abd; }
+
+    .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; white-space: nowrap; }
+    th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; font-size: 14px; }
+    th { background: #f0f0f0; }
+    tr:nth-child(even) td { background: #fafafa; }
   </style>
 </head>
 <body>
-  <table id="myTable">
-    <thead>
-      <tr>
-        <th onclick="sortTable(0)">名前</th>
-        <th onclick="sortTable(1)">年齢</th>
-        <th onclick="sortTable(2)">都市</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr><td>田中</td><td>28</td><td>東京</td></tr>
-      <tr><td>鈴木</td><td>34</td><td>大阪</td></tr>
-      <tr><td>佐藤</td><td>22</td><td>福岡</td></tr>
-      <tr><td>山田</td><td>45</td><td>札幌</td></tr>
-    </tbody>
+
+<div class="section">
+  <h3>📋 表示する列</h3>
+  <div class="col-checks" id="colChecks"></div>
+</div>
+
+<div class="section">
+  <h3>🔃 ソート設定</h3>
+  <div id="sortKeys"></div>
+  <button class="apply-btn" onclick="applySort()">ソート実行</button>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead id="thead"></thead>
+    <tbody id="tbody"></tbody>
   </table>
+</div>
 
-  <script>
-    let lastCol = -1, asc = true;
+<script>
+// ========== ここだけ編集 ==========
+const columns = ["名前", "年齢", "都市", "部署", "売上"];
+const rawData = [
+  ["田中", 28, "東京", "営業", 520],
+  ["鈴木", 34, "大阪", "開発", 310],
+  ["佐藤", 22, "福岡", "人事", 180],
+  ["山田", 45, "札幌", "営業", 890],
+  ["伊藤", 31, "名古屋", "開発", 450],
+  ["渡辺", 27, "東京", "人事", 220],
+];
+// ==================================
 
-    function sortTable(col) {
-      const table = document.getElementById("myTable");
-      const tbody = table.tBodies[0];
-      const rows = Array.from(tbody.rows);
+let currentData = [...rawData];
+let sortOrders = ["asc", "asc", "asc"];
 
-      if (lastCol === col) {
-        asc = !asc;
-      } else {
-        asc = true;
-        lastCol = col;
-      }
+// ── 列選択チェックボックス ──
+function initCheckboxes() {
+  const container = document.getElementById("colChecks");
+  columns.forEach((col, i) => {
+    const label = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = true;
+    cb.dataset.col = i;
+    cb.addEventListener("change", renderTable);
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(" " + col));
+    container.appendChild(label);
+  });
+}
 
-      rows.sort((a, b) => {
-        const aText = a.cells[col].innerText;
-        const bText = b.cells[col].innerText;
-        const aNum = parseFloat(aText);
-        const bNum = parseFloat(bText);
-        const isNum = !isNaN(aNum) && !isNaN(bNum);
-        const result = isNum ? aNum - bNum : aText.localeCompare(bText, "ja");
-        return asc ? result : -result;
-      });
+function getVisibleCols() {
+  return Array.from(document.querySelectorAll("#colChecks input:checked"))
+    .map(cb => parseInt(cb.dataset.col));
+}
 
-      rows.forEach(r => tbody.appendChild(r));
+// ── ソートキー設定 ──
+function initSortKeys() {
+  const container = document.getElementById("sortKeys");
+  ["第1キー", "第2キー", "第3キー"].forEach((label, i) => {
+    const row = document.createElement("div");
+    row.className = "sort-row";
 
-      // ヘッダーの矢印更新
-      Array.from(table.tHead.rows[0].cells).forEach((th, i) => {
-        th.className = i === col ? (asc ? "asc" : "desc") : "";
-      });
+    const lbl = document.createElement("span");
+    lbl.textContent = label;
+
+    const sel = document.createElement("select");
+    sel.id = "sortKey" + i;
+    const none = new Option("（なし）", "-1");
+    sel.appendChild(none);
+    columns.forEach((col, j) => sel.appendChild(new Option(col, j)));
+    if (i === 0) sel.value = "0";
+
+    const btn = document.createElement("button");
+    btn.className = "order-btn asc";
+    btn.textContent = "昇順 ▲";
+    btn.onclick = () => {
+      sortOrders[i] = sortOrders[i] === "asc" ? "desc" : "asc";
+      btn.className = "order-btn " + sortOrders[i];
+      btn.textContent = sortOrders[i] === "asc" ? "昇順 ▲" : "降順 ▼";
+    };
+
+    row.append(lbl, sel, btn);
+    container.appendChild(row);
+  });
+}
+
+// ── ソート実行 ──
+function applySort() {
+  const keys = [0, 1, 2].map(i =>
+    parseInt(document.getElementById("sortKey" + i).value)
+  );
+
+  currentData = [...rawData].sort((a, b) => {
+    for (let i = 0; i < 3; i++) {
+      const col = keys[i];
+      if (col === -1) continue;
+      const isNum = typeof a[col] === "number";
+      const result = isNum
+        ? a[col] - b[col]
+        : String(a[col]).localeCompare(String(b[col]), "ja");
+      if (result !== 0) return sortOrders[i] === "asc" ? result : -result;
     }
-  </script>
+    return 0;
+  });
+
+  renderTable();
+}
+
+// ── テーブル描画 ──
+function renderTable() {
+  const vis = getVisibleCols();
+
+  // ヘッダー
+  const thead = document.getElementById("thead");
+  thead.innerHTML = "";
+  const hr = document.createElement("tr");
+  vis.forEach(i => {
+    const th = document.createElement("th");
+    th.textContent = columns[i];
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr);
+
+  // ボディ
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  currentData.forEach(row => {
+    const tr = document.createElement("tr");
+    vis.forEach(i => {
+      const td = document.createElement("td");
+      td.textContent = row[i];
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+// 初期化
+initCheckboxes();
+initSortKeys();
+renderTable();
+</script>
 </body>
 </html>
